@@ -136,8 +136,5 @@ export class SynchMobileStatusIndicator {
       "data-synch-storage-warning",
       hasStorageWarning ? "true" : "false",
     );
-    if (this.icon) {
-      setIcon(this.icon, "triangle-alert");
-    }
   }
 }

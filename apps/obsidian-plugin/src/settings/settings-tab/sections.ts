@@ -17,6 +17,7 @@ import {
 } from "./format";
 import {
   DeletedFilesModal,
+  FilesNotSyncingModal,
   ExcludedFoldersModal,
   IncludedHiddenFoldersModal,
 } from "./modals";
@@ -471,6 +472,21 @@ export function renderRemoteVaultSettings(
       refresh();
     }),
   );
+
+  // A set-aside file used to be visible only as a tooltip on a small icon,
+  // which is unreachable on mobile. It gets its own row, always present, so a
+  // file that stopped syncing can be found rather than stumbled upon.
+  new Setting(containerEl)
+    .setName(t("notSyncing.header"))
+    .setDesc(t("notSyncing.desc"))
+    .addButton((button) =>
+      button.setButtonText(t("notSyncing.view")).onClick(() => {
+        new FilesNotSyncingModal(app, {
+          listFiles: async () => await controller.listFileSizeBlockedFiles(),
+          retry: async () => await controller.retryFilesNotSyncing(),
+        }).open();
+      }),
+    );
 
   new Setting(containerEl)
     .setName(t("deleted.header"))

@@ -1,12 +1,13 @@
 import { App, Modal, Notice, Setting } from "obsidian";
 
-import { t } from "../../i18n";
+import { formatErrorNotice, t } from "../../i18n";
 import type {
   SynchDeletedFileCursor,
   SynchDeletedFilesPage,
   SynchDeletedFilesPurgeResult,
   SynchDeletedFile,
   SynchDeletedFilesRestoreResult,
+  SynchFileSizeBlockedFile,
   SynchVersionPreview,
 } from "../../plugin/view-models";
 import { VersionPreviewModal } from "../../plugin/version-preview-modal";
@@ -534,5 +535,74 @@ export class DeletedFilesModal extends Modal {
       this.previewingEntryId = null;
       this.render();
     }
+  }
+}
+
+/**
+ * Files Syncali has set aside.
+ *
+ * Until now this was a tooltip on a small icon beside the sync status, which
+ * is unreachable on a phone and easy to miss on a desktop - so a file could
+ * stop syncing and simply never be noticed. A set-aside file is the one
+ * failure a user cannot infer from anything else, so it gets a list, a reason
+ * per file, and a way out that is not "rename it and hope".
+ */
+export class FilesNotSyncingModal extends Modal {
+  constructor(
+    app: App,
+    private readonly deps: {
+      listFiles: () => Promise<SynchFileSizeBlockedFile[]>;
+      retry: () => Promise<void>;
+    },
+  ) {
+    super(app);
+  }
+
+  async onOpen(): Promise<void> {
+    const { contentEl } = this;
+    contentEl.empty();
+    new Setting(contentEl).setName(t("notSyncing.header")).setHeading();
+    contentEl.createEl("p", {
+      text: t("notSyncing.desc"),
+      cls: "synch-modal-hint",
+    });
+
+    const list = contentEl.createDiv();
+    const files = await this.deps.listFiles();
+
+    if (files.length === 0) {
+      list.createEl("p", { text: t("notSyncing.none") });
+      return;
+    }
+
+    for (const file of files) {
+      const row = new Setting(list).setName(file.path);
+      row.setDesc(
+        file.reason === "prepare_failed"
+          ? t("notSyncing.reasonPrepareFailed")
+          : t("notSyncing.reasonTooLarge"),
+      );
+    }
+
+    new Setting(contentEl).addButton((button) =>
+      button
+        .setButtonText(t("notSyncing.retry"))
+        .setCta()
+        .onClick(async () => {
+          button.setDisabled(true).setButtonText(t("notSyncing.retrying"));
+          try {
+            await this.deps.retry();
+            new Notice(t("notSyncing.retried"));
+            this.close();
+          } catch (error) {
+            new Notice(formatErrorNotice(error, "error.autoSync"));
+            button.setDisabled(false).setButtonText(t("notSyncing.retry"));
+          }
+        }),
+    );
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
   }
 }

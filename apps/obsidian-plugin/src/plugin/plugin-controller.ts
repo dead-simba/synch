@@ -588,6 +588,17 @@ export class SynchPluginController implements SynchSettingsController {
     return await this.versionHistoryController.listDeletedFiles(before, limit);
   }
 
+  /**
+   * Put every set-aside file back in the queue and re-scan the vault.
+   *
+   * Until now the only way to make a skipped file sync was to rename it, which
+   * forced a fresh filesystem event. That is not a workflow anyone should have
+   * to discover - a file that is not syncing needs a button, not a trick.
+   */
+  async retryFilesNotSyncing(): Promise<void> {
+    await this.syncController.reconcileAfterFileRuleChange();
+  }
+
   async listFileSizeBlockedFiles(): Promise<SynchFileSizeBlockedFile[]> {
     return await this.syncController.listFileSizeBlockedFiles();
   }
