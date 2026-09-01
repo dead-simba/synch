@@ -27,6 +27,10 @@ export function createSettingsTab(
     listRecentProblems: vi.fn(() => []),
     recentProblemsAsText: vi.fn(() => "No problems recorded."),
     clearRecentProblems: vi.fn(async () => {}),
+    listSyncConflicts: vi.fn(() => []),
+    compareSyncConflict: vi.fn(async () => null),
+    resolveSyncConflict: vi.fn(async () => {}),
+    openSyncConflictPair: vi.fn(async () => {}),
     isSyncEnabled: () => true,
     setSyncEnabled: vi.fn(async () => {}),
     getCommunityPluginUpdateStatus: () => ({

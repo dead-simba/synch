@@ -10,7 +10,12 @@ import type {
   SynchFileSizeBlockedFile,
   SynchVersionPreview,
 } from "../../plugin/view-models";
-import { VersionPreviewModal } from "../../plugin/version-preview-modal";
+import { VersionPreviewModal, renderDiffPreview } from "../../plugin/version-preview-modal";
+import type {
+  SynchSyncConflict,
+  SynchSyncConflictChoice,
+  SynchSyncConflictComparison,
+} from "../../plugin/sync-conflict-controller";
 import { formatDeletedFileTimestamp } from "./format";
 
 const DELETED_FILES_PAGE_SIZE = 25;
@@ -682,4 +687,189 @@ function formatProblemTime(at: number): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+/**
+ * Settle a conflict without going to the file explorer.
+ *
+ * Both versions are kept when sync cannot decide between them, which is the
+ * right call - but it leaves the user with two files, one of them oddly named,
+ * and no way to see what actually differs. Almost nobody does that hunt, so
+ * the copies accumulate and the real edit sits in whichever file was not
+ * opened. Showing the difference and offering the two obvious answers is the
+ * whole job.
+ */
+export class SyncConflictsModal extends Modal {
+  constructor(
+    app: App,
+    private readonly deps: {
+      listConflicts: () => SynchSyncConflict[];
+      compare: (conflict: SynchSyncConflict) => Promise<SynchSyncConflictComparison | null>;
+      resolve: (
+        conflict: SynchSyncConflict,
+        choice: SynchSyncConflictChoice,
+      ) => Promise<void>;
+      openBoth: (conflict: SynchSyncConflict) => Promise<void>;
+    },
+  ) {
+    super(app);
+  }
+
+  onOpen(): void {
+    this.renderList();
+  }
+
+  private renderList(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+    new Setting(contentEl).setName(t("conflicts.header")).setHeading();
+    contentEl.createEl("p", { text: t("conflicts.desc"), cls: "synch-modal-hint" });
+
+    const conflicts = this.deps.listConflicts();
+    if (conflicts.length === 0) {
+      contentEl.createEl("p", { text: t("conflicts.none") });
+      return;
+    }
+
+    for (const conflict of conflicts) {
+      const row = new Setting(contentEl)
+        .setName(conflict.originalPath)
+        .setDesc(t("conflicts.detected", { when: formatWhen(conflict.detectedAt) }));
+
+      row.addButton((button) =>
+        button
+          .setButtonText(t("conflicts.compare"))
+          .setCta()
+          .onClick(() => {
+            this.renderComparison(conflict);
+          }),
+      );
+      row.addButton((button) =>
+        button.setButtonText(t("conflicts.openBoth")).onClick(async () => {
+          await this.deps.openBoth(conflict);
+          this.close();
+        }),
+      );
+    }
+  }
+
+  private renderComparison(conflict: SynchSyncConflict): void {
+    const { contentEl } = this;
+    contentEl.empty();
+    new Setting(contentEl).setName(conflict.originalPath).setHeading();
+
+    new Setting(contentEl)
+      .setName(t("conflicts.inVault"))
+      .setDesc(
+        t("conflicts.fileMeta", {
+          when: formatWhen(conflict.originalModifiedAt),
+          size: formatSize(conflict.originalSizeBytes),
+        }),
+      );
+    new Setting(contentEl)
+      .setName(t("conflicts.theCopy"))
+      .setDesc(
+        t("conflicts.fileMeta", {
+          when: formatWhen(conflict.conflictModifiedAt),
+          size: formatSize(conflict.conflictSizeBytes),
+        }),
+      );
+
+    const diffHost = contentEl.createDiv();
+    void this.renderDifference(diffHost, conflict);
+
+    new Setting(contentEl)
+      .addButton((button) =>
+        button
+          .setButtonText(t("conflicts.keepOriginal"))
+          .setCta()
+          .onClick(async () => {
+            await this.settle(conflict, "original");
+          }),
+      )
+      .addButton((button) =>
+        button.setButtonText(t("conflicts.keepCopy")).onClick(async () => {
+          await this.settle(conflict, "conflict");
+        }),
+      )
+      .addButton((button) =>
+        button.setButtonText(t("conflicts.openBoth")).onClick(async () => {
+          await this.deps.openBoth(conflict);
+          this.close();
+        }),
+      );
+  }
+
+  private async renderDifference(
+    host: HTMLElement,
+    conflict: SynchSyncConflict,
+  ): Promise<void> {
+    if (conflict.originalModifiedAt === 0) {
+      host.createEl("p", {
+        text: t("conflicts.originalMissing"),
+        cls: "synch-modal-hint",
+      });
+      return;
+    }
+
+    const comparison = await this.deps.compare(conflict);
+    if (!comparison) {
+      host.createEl("p", {
+        text: t("conflicts.notComparable"),
+        cls: "synch-modal-hint",
+      });
+      return;
+    }
+
+    if (comparison.originalText === comparison.conflictText) {
+      host.createEl("p", { text: t("conflicts.identical"), cls: "synch-modal-hint" });
+      return;
+    }
+
+    renderDiffPreview(host, comparison.originalText, comparison.conflictText);
+  }
+
+  private async settle(
+    conflict: SynchSyncConflict,
+    choice: SynchSyncConflictChoice,
+  ): Promise<void> {
+    try {
+      await this.deps.resolve(conflict, choice);
+      new Notice(
+        choice === "original"
+          ? t("conflicts.resolvedKeptOriginal", { path: conflict.originalPath })
+          : t("conflicts.resolvedKeptCopy", { path: conflict.originalPath }),
+      );
+      this.renderList();
+    } catch (error) {
+      new Notice(formatErrorNotice(error, "error.autoSync"));
+    }
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
+
+function formatWhen(at: number): string {
+  if (!at) {
+    return "-";
+  }
+
+  const when = new Date(at);
+  const sameDay = new Date().toDateString() === when.toDateString();
+  const time = when.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return sameDay
+    ? `today at ${time}`
+    : `${when.toLocaleDateString(undefined, { month: "short", day: "numeric" })} at ${time}`;
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${Math.round(bytes / 1024)} KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

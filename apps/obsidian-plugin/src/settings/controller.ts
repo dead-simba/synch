@@ -16,6 +16,11 @@ import type {
   SynchSyncState,
   SynchVersionPreview,
 } from "../plugin/view-models";
+import type {
+  SynchSyncConflict,
+  SynchSyncConflictChoice,
+  SynchSyncConflictComparison,
+} from "../plugin/sync-conflict-controller";
 
 export interface SynchSettingsController {
   getCommunityPluginUpdateStatus(): SynchCommunityPluginUpdateStatus;
@@ -40,6 +45,15 @@ export interface SynchSettingsController {
   listRecentProblems(): readonly { at: number; message: string }[];
   recentProblemsAsText(): string;
   clearRecentProblems(): Promise<void>;
+  listSyncConflicts(): SynchSyncConflict[];
+  compareSyncConflict(
+    conflict: SynchSyncConflict,
+  ): Promise<SynchSyncConflictComparison | null>;
+  resolveSyncConflict(
+    conflict: SynchSyncConflict,
+    choice: SynchSyncConflictChoice,
+  ): Promise<void>;
+  openSyncConflictPair(conflict: SynchSyncConflict): Promise<void>;
   isSyncEnabled(): boolean;
   setSyncEnabled(enabled: boolean): Promise<void>;
   getStorageStatus(): SynchStorageStatus | null;

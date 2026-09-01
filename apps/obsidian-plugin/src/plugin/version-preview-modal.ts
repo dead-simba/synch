@@ -101,7 +101,7 @@ export class VersionPreviewModal extends Modal {
   }
 }
 
-function renderDiffPreview(
+export function renderDiffPreview(
   contentEl: HTMLElement,
   versionText: string,
   currentText: string,

@@ -19,6 +19,7 @@ import {
   DeletedFilesModal,
   FilesNotSyncingModal,
   RecentProblemsModal,
+  SyncConflictsModal,
   ExcludedFoldersModal,
   IncludedHiddenFoldersModal,
 } from "./modals";
@@ -515,6 +516,23 @@ export function renderRemoteVaultSettings(
           listProblems: () => controller.listRecentProblems(),
           asText: () => controller.recentProblemsAsText(),
           clear: async () => await controller.clearRecentProblems(),
+        }).open();
+      }),
+    );
+
+  // Both versions are kept when sync cannot choose, which is right - but that
+  // left the user to find two files in the explorer and work out what differs.
+  new Setting(containerEl)
+    .setName(t("conflicts.header"))
+    .setDesc(t("conflicts.desc"))
+    .addButton((button) =>
+      button.setButtonText(t("conflicts.view")).onClick(() => {
+        new SyncConflictsModal(app, {
+          listConflicts: () => controller.listSyncConflicts(),
+          compare: async (conflict) => await controller.compareSyncConflict(conflict),
+          resolve: async (conflict, choice) =>
+            await controller.resolveSyncConflict(conflict, choice),
+          openBoth: async (conflict) => await controller.openSyncConflictPair(conflict),
         }).open();
       }),
     );

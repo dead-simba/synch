@@ -11,6 +11,12 @@ import {
   type SynchErrorContextKey,
 } from "../i18n";
 import { SyncErrorLog, type SyncErrorLogEntry } from "./error-log";
+import {
+  SynchSyncConflictController,
+  type SynchSyncConflict,
+  type SynchSyncConflictChoice,
+  type SynchSyncConflictComparison,
+} from "./sync-conflict-controller";
 import { AuthManager, type AuthReadiness } from "../auth/manager";
 import { SynchPluginDataStore } from "../plugin-data";
 import type { SynchSettingsController } from "../settings/controller";
@@ -80,6 +86,9 @@ export class SynchPluginController implements SynchSettingsController {
   private readonly pluginDataStore = new SynchPluginDataStore(this.plugin);
   private readonly settingsStore = new SynchSettingsStore(this.pluginDataStore);
   private readonly errorLog = new SyncErrorLog(this.pluginDataStore);
+  private readonly syncConflicts = new SynchSyncConflictController({
+    plugin: this.plugin,
+  });
   private readonly billingClient = new BillingClient();
   private readonly pluginUpdateChecker = new SynchPluginUpdateChecker();
   private readonly serverPluginVersionChecker = new SynchServerPluginVersionChecker();
@@ -940,6 +949,27 @@ export class SynchPluginController implements SynchSettingsController {
 
   recentProblemsAsText(): string {
     return this.errorLog.toText();
+  }
+
+  listSyncConflicts(): SynchSyncConflict[] {
+    return this.syncConflicts.listConflicts();
+  }
+
+  async compareSyncConflict(
+    conflict: SynchSyncConflict,
+  ): Promise<SynchSyncConflictComparison | null> {
+    return await this.syncConflicts.compareConflict(conflict);
+  }
+
+  async resolveSyncConflict(
+    conflict: SynchSyncConflict,
+    choice: SynchSyncConflictChoice,
+  ): Promise<void> {
+    await this.syncConflicts.resolveConflict(conflict, choice);
+  }
+
+  async openSyncConflictPair(conflict: SynchSyncConflict): Promise<void> {
+    await this.syncConflicts.openConflictPair(conflict);
   }
 
   async clearRecentProblems(): Promise<void> {

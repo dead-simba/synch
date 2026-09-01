@@ -86,3 +86,55 @@ function formatConflictTimestamp(value: number): string {
   const seconds = String(date.getSeconds()).padStart(2, "0");
   return `${year}${month}${day}-${hours}${minutes}${seconds}`;
 }
+
+/**
+ * A conflict copy, read back from its name.
+ *
+ * Resolving a conflict means comparing two files and deleting one. Finding
+ * them by hand in the file explorer - where the copy sorts next to the
+ * original only if the name came out right - is the part people give up on.
+ */
+export interface ParsedConflictCopy {
+  /** The file this is a copy of. */
+  originalPath: string;
+  /** When the conflict was noticed, not when the writing happened. */
+  detectedAt: number;
+}
+
+const CONFLICT_MARKER =
+  /\.sync-conflict-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})(?:-\d+)?/;
+
+export function parseConflictCopyPath(path: string): ParsedConflictCopy | null {
+  const slashIndex = path.lastIndexOf("/");
+  const parent = slashIndex >= 0 ? path.slice(0, slashIndex + 1) : "";
+  const fileName = slashIndex >= 0 ? path.slice(slashIndex + 1) : path;
+
+  const match = CONFLICT_MARKER.exec(fileName);
+  if (!match || match.index === undefined) {
+    return null;
+  }
+
+  // Everything on either side of the marker belongs to the original name.
+  // Older copies put the marker mid-name - "V2.sync-conflict-....2 Ground
+  // Floor" - and those still have to lead back to the file they came from.
+  const originalName =
+    fileName.slice(0, match.index) + fileName.slice(match.index + match[0].length);
+  if (!originalName) {
+    return null;
+  }
+
+  const [, year, month, day, hours, minutes, seconds] = match;
+  const detectedAt = new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hours),
+    Number(minutes),
+    Number(seconds),
+  ).getTime();
+
+  return {
+    originalPath: `${parent}${originalName}`,
+    detectedAt: Number.isFinite(detectedAt) ? detectedAt : 0,
+  };
+}
