@@ -257,6 +257,18 @@ export class SyncEngine {
         fileRules: this.deps.getSyncFileRules(),
         vaultConfigRules: this.deps.getVaultConfigSyncRules(),
       }),
+    onUndecryptableEntry: (event) => {
+      // Damaged beyond this device's reach: without its metadata there is no
+      // path to name and nothing to write. Saying so is all that can be done,
+      // and is better than a file quietly never arriving.
+      this.deps.notifyError(
+        new Error(
+          `A synced item could not be read and has been skipped so the rest of your vault keeps syncing ` +
+            `(entry ${event.entryId}@${event.revision}). Re-saving that file on the device it came from will replace it.`,
+        ),
+        "error.autoSync",
+      );
+    },
     eventGate: this.syncEventGate,
     vaultAdapter: this.vaultAdapter,
     pullClient: this.syncPullClient,

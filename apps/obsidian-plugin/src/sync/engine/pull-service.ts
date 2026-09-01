@@ -26,6 +26,11 @@ export interface SyncPullServiceDeps {
   getSyncStore: () => SyncPullStore | null;
   getRemoteVaultKey: () => Uint8Array;
   shouldApplyRemotePath?: (path: string) => boolean;
+  onUndecryptableEntry?: (event: {
+    entryId: string;
+    revision: number;
+    error: unknown;
+  }) => void;
   vaultAdapter: PullVaultAdapter;
   eventGate?: SyncEventGateLike;
   pullClient?: Pick<SyncPullClient, "downloadBlob">;
@@ -63,6 +68,7 @@ export class SyncPullService {
       eventGate: this.deps.eventGate,
       pullClient: this.pullClient,
       shouldApplyRemotePath: this.deps.shouldApplyRemotePath,
+      onUndecryptableEntry: this.deps.onUndecryptableEntry,
       prepareConcurrency:
         this.deps.prepareConcurrency ?? DEFAULT_PULL_PREPARE_CONCURRENCY,
       onProgress: async (progress) => {

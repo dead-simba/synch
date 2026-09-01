@@ -49,6 +49,16 @@ export interface PullEntryStateApplierDeps {
   eventGate?: SyncEventGateLike;
   pullClient: Pick<SyncPullClient, "downloadBlob">;
   shouldApplyRemotePath?: (path: string) => boolean;
+  /**
+   * Called when an entry's metadata cannot be decrypted, so it has to be
+   * skipped. Lets the runtime tell the user which entry is damaged instead of
+   * silently syncing everything except one file.
+   */
+  onUndecryptableEntry?: (event: {
+    entryId: string;
+    revision: number;
+    error: unknown;
+  }) => void;
   prepareConcurrency?: number;
   onProgress?: (progress: SyncProgressCounts) => Promise<void>;
   onConflict?: (event: PullConflictEvent) => void;
@@ -114,18 +124,41 @@ export class PullEntryStateApplier {
   ): Promise<PullEntryStateManifestItem[]> {
     const remoteVaultKey = this.deps.getRemoteVaultKey();
 
-    return await mapWithConcurrency(
+    const items = await mapWithConcurrency(
       states,
       this.deps.prepareConcurrency ?? DEFAULT_PREPARE_CONCURRENCY,
-      async (state) => ({
-        state,
-        metadata: await decryptSyncMetadata(
-          remoteVaultKey,
-          state.encryptedMetadata,
-          metadataContextFromRemoteState(state),
-        ),
-      }),
+      async (state) => {
+        try {
+          return {
+            state,
+            metadata: await decryptSyncMetadata(
+              remoteVaultKey,
+              state.encryptedMetadata,
+              metadataContextFromRemoteState(state),
+            ),
+          };
+        } catch (error) {
+          // One entry whose metadata will not decrypt used to stop the whole
+          // pull, permanently: the cursor never advanced, so every retry
+          // fetched the same damaged record and failed at the same place. The
+          // vault key is plainly fine - every other entry in the same batch
+          // decrypts with it - so this is one damaged record, and the rest of
+          // the vault should not be held hostage to it.
+          //
+          // Without its metadata there is no path and nothing that can be
+          // written, so it is dropped from the manifest and reported. The
+          // cursor then advances past it with the rest of the window.
+          this.deps.onUndecryptableEntry?.({
+            entryId: state.entryId,
+            revision: state.revision,
+            error,
+          });
+          return null;
+        }
+      },
     );
+
+    return items.filter((item): item is PullEntryStateManifestItem => item !== null);
   }
 
   async applyEntryStates(
