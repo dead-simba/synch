@@ -285,6 +285,9 @@ export class SyncEngine {
   });
   constructor(private readonly deps: SyncEngineDeps) {}
 
+  /** Entries already reported as unreadable, so a backlog reports each once. */
+  private readonly reportedUndecryptableEntries = new Set<string>();
+
   setStore(store: SyncStore): void {
     this.syncStore = store;
   }
@@ -612,8 +615,18 @@ export class SyncEngine {
   private async reportUndecryptableEntry(event: {
     entryId: string;
     revision: number;
+    updatedAt: number;
+    deleted: boolean;
     error: unknown;
   }): Promise<void> {
+    // A backlog delivers every revision of an entry in turn, so one bad record
+    // committed five times produced five near-identical notices in half a
+    // minute. That reads like five broken files. Report each entry once.
+    if (this.reportedUndecryptableEntries.has(event.entryId)) {
+      return;
+    }
+    this.reportedUndecryptableEntries.add(event.entryId);
+
     let path: string | null = null;
     try {
       path = (await this.syncStore?.getEntryById(event.entryId))?.path ?? null;
@@ -624,13 +637,15 @@ export class SyncEngine {
     this.deps.notifyError(
       new Error(
         path
-          ? `"${path}" could not be read and has been skipped so the rest of your vault keeps syncing. ` +
+          ? `"${path}" could not be read, so it was skipped. Everything else is syncing. ` +
             `Open it on the device it came from and re-save it to replace the damaged copy.`
-          : `A synced item could not be read and has been skipped so the rest of your vault keeps syncing ` +
-            `(entry ${event.entryId}@${event.revision}). It has never reached this device, so compare your ` +
-            `devices to find what is missing, then re-save that file where it does exist.`,
+          : `An item written ${describeWriteTime(event.updatedAt)} could not be read, so it was ` +
+            `skipped. Everything else is syncing. This device has never had a copy, so look on your ` +
+            `other device for what you ${event.deleted ? "deleted" : "changed"} then, and re-save it ` +
+            `there. If it happens again for the same item, disconnect and reconnect the vault on that ` +
+            `device. (entry ${event.entryId})`,
       ),
-      "error.autoSync",
+      "error.itemSkipped",
     );
   }
 
@@ -823,4 +838,24 @@ export interface SyncFileSizeBlockedFile {
   path: string;
   encryptedSizeBytes: number | null;
   maxFileSizeBytes: number | null;
+}
+
+/**
+ * When an unreadable item was written, in words.
+ *
+ * The path is inside the metadata that will not decrypt, so it cannot be
+ * named. The write time is not encrypted, and "written at 08:00 today" is
+ * enough to find the file on the other device - a UUID is not.
+ */
+function describeWriteTime(updatedAt: number): string {
+  if (!Number.isFinite(updatedAt) || updatedAt <= 0) {
+    return "at an unknown time";
+  }
+
+  const when = new Date(updatedAt);
+  const sameDay = new Date().toDateString() === when.toDateString();
+  const time = when.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return sameDay
+    ? `today at ${time}`
+    : `on ${when.toLocaleDateString(undefined, { month: "short", day: "numeric" })} at ${time}`;
 }

@@ -150,6 +150,7 @@ const en = {
     "notSyncing.retried": "Queued for another attempt. Watch the sync status.",
     "notSyncing.reasonTooLarge": "Larger than the file size limit",
     "notSyncing.reasonPrepareFailed": "Could not be prepared for upload",
+    "error.itemSkipped": "Sync skipped one item",
     "problems.header": "Recent problems",
     "problems.desc": "The last 50 errors Syncali showed you, kept so you can read one after the notice has gone.",
     "problems.view": "View problems",
@@ -1235,6 +1236,7 @@ export type SynchErrorContextKey =
   | "error.autoSyncInitialization"
   | "error.autoSyncResume"
   | "error.hiddenFolderScan"
+  | "error.itemSkipped"
   | "error.localSyncStateReset"
   | "error.localSyncStoreInitialization"
   | "error.pluginSettingsInitialization"

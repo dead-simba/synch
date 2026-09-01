@@ -57,6 +57,9 @@ export interface PullEntryStateApplierDeps {
   onUndecryptableEntry?: (event: {
     entryId: string;
     revision: number;
+    /** Unencrypted, so it survives the failure - and it is how you find the file. */
+    updatedAt: number;
+    deleted: boolean;
     error: unknown;
   }) => void;
   prepareConcurrency?: number;
@@ -151,6 +154,8 @@ export class PullEntryStateApplier {
           this.deps.onUndecryptableEntry?.({
             entryId: state.entryId,
             revision: state.revision,
+            updatedAt: state.updatedAt,
+            deleted: state.deleted,
             error,
           });
           return null;

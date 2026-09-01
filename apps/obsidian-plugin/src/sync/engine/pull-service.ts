@@ -29,6 +29,8 @@ export interface SyncPullServiceDeps {
   onUndecryptableEntry?: (event: {
     entryId: string;
     revision: number;
+    updatedAt: number;
+    deleted: boolean;
     error: unknown;
   }) => void;
   vaultAdapter: PullVaultAdapter;
