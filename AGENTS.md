@@ -18,6 +18,18 @@ Favor long-term maintainability over quick patches. Do not paper over symptoms w
 - Keep changes scoped, but make the scope large enough to avoid duplicating logic, bypassing invariants, or adding special cases that future work will have to unwind.
 - When a short-term workaround is unavoidable, document the reason, the tradeoff, and the follow-up needed to remove it.
 
+## Debugging the Sync Engine
+
+`docs/failure-patterns.md` records what has actually broken, the shapes that
+recur, and the measurements that find them. Read it before changing the sync
+engine, and add to it when a bug turns out to be an instance of something
+rather than a one-off.
+
+Its first rule is the important one: **diagnose by measuring, not by reasoning
+about the code.** Before proposing a cause, produce a number that only that
+cause explains. Every confident theory in this project's history that was not
+backed by a measurement turned out to be wrong.
+
 ## User-Facing Copy
 
 All user-visible text - website, auth pages, plugin notices, error messages,
