@@ -50,7 +50,8 @@ export type PlannedVaultMove = {
 
 export type AdoptedLocalEntry = {
   entry: SyncEntryRow;
-  pending: PendingMutationRow;
+  /** Absent when the local file is simply sitting there, with nothing queued. */
+  pending: PendingMutationRow | null;
   hashMatches: boolean;
 };
 

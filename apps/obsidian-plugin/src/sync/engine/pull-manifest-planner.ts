@@ -247,7 +247,19 @@ export class PullManifestPlanner {
     }
 
     const pending = await store.getDirtyEntryMutation(pathOwner.entryId);
-    if (!pending || pending.op !== "upsert") {
+    if (!pending) {
+      // Same path, same bytes, two identities - and nothing queued to
+      // reconcile them. Refusing to adopt here wrote a conflict copy of a file
+      // identical to the one already sitting there, and did it again on the
+      // next revision, and the next: a phone was producing a new copy every
+      // few seconds. There is no conflict between two files that are the same,
+      // so take the remote identity for this path and keep the one file.
+      return pathOwner.hash && pathOwner.hash === remoteHash
+        ? { entry: pathOwner, pending: null, hashMatches: true }
+        : null;
+    }
+
+    if (pending.op !== "upsert") {
       return null;
     }
 
