@@ -466,6 +466,26 @@ export class DexieSyncStore implements SyncStore {
             row = clearPendingMutation(row);
           }
 
+          if (update.clearLocal) {
+            row = {
+              ...row,
+              localKnown: false,
+              localPath: null,
+              localBlobId: null,
+              localHash: null,
+              localDeleted: false,
+              localUpdatedAt: 0,
+              localMtime: null,
+              localSize: null,
+            };
+            if (!row.remoteKnown && !row.dirty) {
+              if (existingRow) {
+                entriesToDelete.push(existingRow);
+              }
+              continue;
+            }
+          }
+
           if (update.local) {
             row = {
               ...row,

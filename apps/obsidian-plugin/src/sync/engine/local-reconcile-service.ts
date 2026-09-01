@@ -292,9 +292,17 @@ export class SyncLocalReconcileService {
         continue;
       }
 
+      // Dropping the whole row only works when nothing remote points at it.
+      // With a remote present the row survived with localKnown still set, so
+      // the next scan found the same excluded path and swept it again - seen
+      // in the wild as one conflict copy from three weeks earlier rewritten
+      // eighty times in a single session, while sync never reported itself
+      // done. Forgetting the local side ends it: the remote is the server's
+      // business, but this device does not hold a file it will never write.
       cleanupUpdates.push({
         entryId: entry.entryId,
         clearDirty: true,
+        clearLocal: true,
         deleteEntry: !entry.remote || entry.remote.revision === 0,
       });
     }

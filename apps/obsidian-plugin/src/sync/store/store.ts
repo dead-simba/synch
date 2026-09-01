@@ -101,6 +101,13 @@ export interface SyncReconcileEntryUpdate {
   local?: LocalSyncEntryRow;
   dirty?: PendingMutationRow | null;
   clearDirty?: boolean;
+  /**
+   * Forget that this device holds a copy, without touching the remote side.
+   *
+   * For a path this device will never write - one the rules now exclude - the
+   * row is otherwise re-swept on every scan, forever.
+   */
+  clearLocal?: boolean;
   deleteEntry?: boolean;
   requireBaseBlob?: boolean;
 }
