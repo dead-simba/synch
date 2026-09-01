@@ -95,3 +95,40 @@ describe("SyncLocalReconcileService stat cache", () => {
     await store.close();
   });
 });
+
+describe("a file that cannot be read during a scan", () => {
+  it("is skipped instead of failing the whole scan", async () => {
+    // Reading fails for ordinary reasons while a vault is being edited: the
+    // file was renamed since the listing, Obsidian is mid-save, the OS will not
+    // hand it over yet. The scan is what tells the engine what to sync, so
+    // losing all of it to one file made errors feel like a daily occurrence.
+    const store = await createInitializedTestSyncStore(createTestPlugin());
+    const service = new SyncLocalReconcileService({
+      getSyncStore: () => store,
+      getRemoteVaultKey: () => TEST_VAULT_KEY,
+      shouldSyncPath: () => true,
+      scanner: {
+        async listFiles() {
+          return [
+            localFile("Notes/readable.md", encodeUtf8("body")),
+            {
+              path: "Notes/vanished.md",
+              mtime: 10,
+              size: 4,
+              async readBytes(): Promise<Uint8Array> {
+                throw new Error("ENOENT: no such file or directory");
+              },
+            },
+          ];
+        },
+      },
+    });
+
+    const result = await service.reconcileOnce();
+
+    // The readable file still gets queued; the unreadable one is simply left
+    // for the next scan rather than taking this one down with it.
+    expect(result.filesQueuedForUpsert).toBe(1);
+    await store.close();
+  });
+});

@@ -118,13 +118,31 @@ export class SyncLocalReconcileService {
       });
     }
 
-    const hashedFiles = await mapWithConcurrency(
+    // Reading a file can fail for entirely ordinary reasons: it was renamed or
+    // deleted since the directory listing, Obsidian is mid-save, the OS will
+    // not hand it over this instant. mapWithConcurrency is Promise.all, so one
+    // such file used to reject the whole scan - and without a scan the engine
+    // cannot work out what to sync at all. A vault being actively edited hits
+    // this routinely, which is what made errors feel like they arrived daily.
+    //
+    // A file skipped here is not lost: the next scan picks it up, and the file
+    // watcher queues it the moment it changes again.
+    const hashedOrSkipped = await mapWithConcurrency(
       hashInputs,
       this.deps.hashConcurrency ?? DEFAULT_RECONCILE_HASH_CONCURRENCY,
-      async (input) => ({
-        ...input,
-        hash: await hashBytes(await input.file.readBytes()),
-      }),
+      async (input) => {
+        try {
+          return {
+            ...input,
+            hash: await hashBytes(await input.file.readBytes()),
+          };
+        } catch {
+          return null;
+        }
+      },
+    );
+    const hashedFiles = hashedOrSkipped.filter(
+      (entry): entry is (typeof hashedOrSkipped)[number] & object => entry !== null,
     );
 
     for (const {
