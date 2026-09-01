@@ -6,4 +6,5 @@
 
 ## Fixed
 
-- Server problems were reported as "Unexpected token 'e', ... is not valid JSON" instead of what the server actually said. When infrastructure fails it replies in plain text, and reading that as JSON threw a parse error that described our parser rather than your problem.
+- A failure to decrypt reported only "OperationError", which named neither the file nor the problem. It now says which entry failed and that the data may be damaged or the vault password may not match.
+- Server problems were reported as "Unexpected token 'e', ... is not valid JSON" instead of what the server actually said.

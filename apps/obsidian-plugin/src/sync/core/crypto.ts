@@ -103,6 +103,29 @@ export async function decryptSyncBlob(
   );
 }
 
+/**
+ * A decryption that failed, and what it was trying to decrypt.
+ *
+ * WebCrypto reports every failure as a bare `OperationError` with no message,
+ * so a sync error read only "Automatic sync failed: OperationError" - no file,
+ * no operation, nothing to act on or report. The causes are very different
+ * (corrupt stored bytes, a truncated download, a mismatched key) and telling
+ * them apart starts with knowing which entry and which kind of data.
+ */
+export class SyncDecryptionError extends Error {
+  constructor(
+    readonly kind: "metadata" | "blob",
+    readonly detail: string,
+    readonly cause: unknown,
+  ) {
+    super(
+      `Could not decrypt ${kind} for ${detail}. The stored data may be damaged, ` +
+        `or this device's vault password may not match the one the data was saved with.`,
+    );
+    this.name = "SyncDecryptionError";
+  }
+}
+
 class VaultSyncCryptoContext implements SyncCryptoContext {
   private importedKey: CryptoKey | null = null;
   private readonly usageKeys = new Map<string, CryptoKey>();
@@ -128,12 +151,21 @@ class VaultSyncCryptoContext implements SyncCryptoContext {
     context: SyncMetadataCryptoContext,
   ): Promise<SyncedEntryMetadata> {
     const key = await this.getUsageKey("sync-metadata", ENVELOPE_VERSION);
-    const plaintext = await decryptEnvelope(
-      key,
-      encryptedMetadata,
-      encodeMetadataAad(context),
-      ENVELOPE_VERSION,
-    );
+    let plaintext: Uint8Array;
+    try {
+      plaintext = await decryptEnvelope(
+        key,
+        encryptedMetadata,
+        encodeMetadataAad(context),
+        ENVELOPE_VERSION,
+      );
+    } catch (error) {
+      throw new SyncDecryptionError(
+        "metadata",
+        `entry ${context.entryId}@${context.revision}`,
+        error,
+      );
+    }
     return parseSyncedEntryMetadata(new TextDecoder().decode(plaintext));
   }
 
@@ -165,19 +197,32 @@ class VaultSyncCryptoContext implements SyncCryptoContext {
     context: SyncBlobCryptoContext,
     options: SyncBlobEnvelopeOptions,
   ): Promise<Uint8Array> {
-    switch (options.syncFormatVersion) {
-      case ENVELOPE_VERSION:
-        return await decryptEnvelope(
-          await this.getUsageKey("sync-blob", ENVELOPE_VERSION),
-          new TextDecoder().decode(encryptedBlob),
-          encodeBlobAad(context, ENVELOPE_VERSION),
-          ENVELOPE_VERSION,
-        );
-      case SYNC_BLOB_BINARY_ENVELOPE_VERSION:
-        return await this.decryptBinaryBlobEnvelope(encryptedBlob, context);
-      default:
-        throwUnsupportedSyncBlobFormatVersion(options.syncFormatVersion);
+    try {
+      switch (options.syncFormatVersion) {
+        case ENVELOPE_VERSION:
+          return await decryptEnvelope(
+            await this.getUsageKey("sync-blob", ENVELOPE_VERSION),
+            new TextDecoder().decode(encryptedBlob),
+            encodeBlobAad(context, ENVELOPE_VERSION),
+            ENVELOPE_VERSION,
+          );
+        case SYNC_BLOB_BINARY_ENVELOPE_VERSION:
+          return await this.decryptBinaryBlobEnvelope(encryptedBlob, context);
+      }
+    } catch (error) {
+      if (error instanceof SyncDecryptionError) {
+        throw error;
+      }
+      throw new SyncDecryptionError(
+        "blob",
+        `blob ${context.blobId} (${encryptedBlob.byteLength} bytes)`,
+        error,
+      );
     }
+
+    // Reached only when the format version matches no case above; the switch
+    // returns for every version we understand.
+    throwUnsupportedSyncBlobFormatVersion(options.syncFormatVersion);
   }
 
   dispose(): void {

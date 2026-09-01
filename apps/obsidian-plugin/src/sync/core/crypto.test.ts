@@ -184,3 +184,26 @@ describe("sync crypto", () => {
     ).rejects.toThrow();
   });
 });
+
+describe("decryption failures", () => {
+  it("names the blob instead of throwing a bare OperationError", async () => {
+    // WebCrypto reports every failure as an unadorned OperationError, so a sync
+    // error read only "Automatic sync failed: OperationError" - no file, no
+    // operation, nothing the user or a maintainer could act on.
+    const key = new Uint8Array(32).fill(1);
+    const corrupt = new TextEncoder().encode("not an envelope");
+
+    await expect(
+      decryptSyncBlob(key, corrupt, { blobId: "blob-1" }, { syncFormatVersion: 2 }),
+    ).rejects.toThrow(/blob blob-1/);
+  });
+
+  it("says the data may be damaged or the password may not match", async () => {
+    const key = new Uint8Array(32).fill(1);
+    const corrupt = new TextEncoder().encode("not an envelope");
+
+    await expect(
+      decryptSyncBlob(key, corrupt, { blobId: "blob-1" }, { syncFormatVersion: 2 }),
+    ).rejects.toThrow(/damaged|vault password/);
+  });
+});
