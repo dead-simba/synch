@@ -44,7 +44,22 @@ export function renderSettingsHeading(
 ): void {
   const serverCompatibility = controller.getServerCompatibilityStatus();
   const communityUpdate = controller.getCommunityPluginUpdateStatus();
+  // The running version, where someone looking for it would look. Installs
+  // drift - a phone on BRAT, a second vault copied by hand, a desktop that has
+  // not reloaded since the files changed - and "which version is this?" is
+  // otherwise only answerable by reading a manifest on disk.
   const heading = new Setting(containerEl).setName("Syncali").setHeading();
+  // The running version, beside the name, where someone looking for it would
+  // look. Installs drift - a phone on BRAT, a second vault copied by hand, a
+  // desktop that has not reloaded since the files changed - and otherwise the
+  // only answer is reading a manifest on disk.
+  //
+  // It goes in the control area rather than the description so it sits beside
+  // the update badge and does not occupy the row's explanatory text.
+  heading.controlEl.createSpan({
+    cls: "synch-plugin-version",
+    text: t("plugin.version", { version: controller.getPluginVersion() }),
+  });
   if (
     serverCompatibility.state === "update_required" ||
     serverCompatibility.state === "incompatible"

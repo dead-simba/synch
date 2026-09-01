@@ -491,3 +491,21 @@ describe("SynchSettingTab", () => {
   });
 
 });
+
+describe("SynchSettingTab version", () => {
+  it("shows the running version beside the heading", () => {
+    // Installs drift: a phone on BRAT, a second vault copied by hand, a desktop
+    // that has not reloaded since the files changed. Without this the only way
+    // to answer "which version is this?" is to read a manifest on disk.
+    const tab = createSettingsTab({});
+
+    tab.display();
+
+    expect(getCreatedElements()).toContainEqual({
+      tag: "span",
+      text: "Version 0.0.0-test",
+      classes: ["synch-plugin-version"],
+      attributes: {},
+    });
+  });
+});

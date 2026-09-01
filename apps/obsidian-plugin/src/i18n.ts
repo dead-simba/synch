@@ -95,6 +95,7 @@ const en = {
     manage: "Manage",
     "network.required": "Network connection required",
     "network.requiredDesc": "Connect to the internet to check sign-in.",
+    "plugin.version": ({ version }: { version: string }) => `Version ${version}`,
     "plugin.latestAvailable": "Update Syncali from Community plugins",
     "plugin.updateRequired": "Update required",
     "plugin.updateRequiredStatus": "Plugin update required.",

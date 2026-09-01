@@ -33,6 +33,8 @@ export interface SynchSettingsController {
   getSyncStatusLabel(): string;
   getSyncPercent(): number;
   getSyncProgress(): SynchSyncProgress;
+  /** Version of the plugin actually running, for the settings heading. */
+  getPluginVersion(): string;
   listFileSizeBlockedFiles(): Promise<SynchFileSizeBlockedFile[]>;
   retryFilesNotSyncing(): Promise<void>;
   isSyncEnabled(): boolean;

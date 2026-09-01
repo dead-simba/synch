@@ -599,6 +599,10 @@ export class SynchPluginController implements SynchSettingsController {
     await this.syncController.reconcileAfterFileRuleChange();
   }
 
+  getPluginVersion(): string {
+    return this.plugin.manifest.version;
+  }
+
   async listFileSizeBlockedFiles(): Promise<SynchFileSizeBlockedFile[]> {
     return await this.syncController.listFileSizeBlockedFiles();
   }

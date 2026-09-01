@@ -532,3 +532,11 @@
 		animation: none;
 	}
 }
+
+/* Running version, beside the settings heading. Quiet by design: useful when
+ * you go looking for it, invisible when you are not. */
+.synch-plugin-version {
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+	font-variant-numeric: tabular-nums;
+}
