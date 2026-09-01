@@ -61,13 +61,10 @@
 		"SYNC_TOKEN_TTL_SECONDS": 120,
 		"SELF_HOSTED": true
 	},
-	// Pulling a large attachment streams an R2 body through the Worker, and a
-	// vault restore replays the whole entry manifest - both run long enough that
-	// the default CPU ceiling is the wrong one. Declared here so a CLI deploy
-	// does not silently revert a limit set through the dashboard.
-	"limits": {
-		"cpu_ms": 300000
-	},
+	// No "limits" block: CPU limits are a paid-plan feature, and declaring one
+	// makes the API reject the deploy outright on Free. The tight Free-plan CPU
+	// budget is the constraint this Worker has to live within, which is why
+	// batching matters more here than on a paid plan.
 	// Without this a deploy turns dashboard logging off, which is exactly what
 	// you need when a client is failing against a self-hosted server.
 	"observability": {
