@@ -54,6 +54,14 @@ export interface SyncControllerDeps {
   hasAuthenticatedSession: () => boolean;
   notifyError: (error: unknown, contextKey: SynchErrorContextKey) => void;
   notify?: (message: string, timeout?: number) => void;
+  /**
+   * Keep a notice that reports a problem, not just show it.
+   *
+   * A conflict, a path collision or a rejected rollback each name a file that
+   * needs a decision. They were shown as an ordinary Notice, so on a phone
+   * they were gone in seconds with nothing to go back to.
+   */
+  recordProblem?: (message: string) => void;
   onSyncStatusChange?: () => void;
   onStorageStatusChange?: () => void;
   onFileSizeBlockedFilesChange?: () => void;
@@ -439,6 +447,12 @@ export class SyncController {
     this.deps.onStorageStatusChange?.();
   }
 
+  /** Show a problem and keep it, so it can still be read once the notice fades. */
+  private notifyProblem(message: string): void {
+    this.notify(message);
+    this.deps.recordProblem?.(message);
+  }
+
   private notify(message: string, timeout?: number): void {
     if (this.deps.notify) {
       this.deps.notify(message, timeout);
@@ -462,20 +476,20 @@ export class SyncController {
     conflictPath: string | null;
   }): void {
     if (event.reason === "remote_path_collision" && event.conflictPath) {
-      this.notify(
+      this.notifyProblem(
         t("sync.pathCollision", { path: event.conflictPath }),
       );
       return;
     }
 
     if (event.op === "upsert" && event.conflictPath) {
-      this.notify(
+      this.notifyProblem(
         t("sync.conflictLocalSaved", { path: event.conflictPath }),
       );
       return;
     }
 
-    this.notify(
+    this.notifyProblem(
       t("sync.conflictRemoteKept", { path: event.originalPath }),
     );
   }
@@ -494,7 +508,7 @@ export class SyncController {
         (event.path ? ` (${event.path})` : "") +
         `: server sent revision ${event.remoteRevision}, already had ${event.localRevision}`,
     );
-    this.notify(
+    this.notifyProblem(
       t("sync.rollbackDetected", { path: event.path ?? event.entryId }),
     );
   }

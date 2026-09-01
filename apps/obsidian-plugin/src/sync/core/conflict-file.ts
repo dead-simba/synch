@@ -59,7 +59,12 @@ function buildConflictCopyPath(
   const parent = slashIndex >= 0 ? path.slice(0, slashIndex) : "";
   const fileName = slashIndex >= 0 ? path.slice(slashIndex + 1) : path;
   const dotIndex = fileName.lastIndexOf(".");
-  const hasExtension = dotIndex > 0;
+  // A dot does not make an extension. "V2.2 Ground Floor" has its last dot at
+  // index 2, so splitting there put the marker in the middle of the name:
+  // "V2.sync-conflict-20260901-081141.2 Ground Floor". The result no longer
+  // reads as a copy of anything, and sorts nowhere near the file it came from.
+  // A real extension has no spaces in it.
+  const hasExtension = dotIndex > 0 && !/\s/.test(fileName.slice(dotIndex));
   const stem = hasExtension ? fileName.slice(0, dotIndex) : fileName;
   const extension = hasExtension ? fileName.slice(dotIndex) : "";
   const prefix = parent ? `${parent}/` : "";

@@ -150,6 +150,9 @@ export class SynchPluginController implements SynchSettingsController {
     notify: (message, timeout) => {
       new Notice(message, timeout);
     },
+    recordProblem: (message) => {
+      this.recordProblem(message);
+    },
     onSyncStatusChange: () => {
       this.emitUiEvent({ type: "sync-status-changed" });
     },
@@ -915,9 +918,18 @@ export class SynchPluginController implements SynchSettingsController {
   private notifyError(error: unknown, contextKey: SynchErrorContextKey): void {
     const message = formatErrorNotice(error, contextKey);
     new Notice(message);
-    // A notice is gone in seconds, and on a phone there is no console behind
-    // it. Keeping the text means a problem seen while walking can still be
-    // read, and reported, once you are back at a desk.
+    this.recordProblem(message);
+  }
+
+  /**
+   * Keep the text of a problem the user was shown.
+   *
+   * A notice is gone in seconds, and on a phone there is no console behind it.
+   * Errors are not the only thing worth keeping: a conflict or a path
+   * collision names a file that needs a decision, and those were the ones
+   * fading away unread.
+   */
+  private recordProblem(message: string): void {
     this.errorLog.record(message);
     void this.errorLog.persist();
   }

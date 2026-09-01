@@ -82,6 +82,19 @@ describe("the log of recent problems", () => {
     expect(log.list()).toEqual([]);
   });
 
+  it("keeps a conflict notice, not only an error", () => {
+    // The first thing the log missed: a path collision names a file that needs
+    // a decision, and it was shown as an ordinary Notice - so on a phone it
+    // was gone in seconds with nothing to go back to.
+    const log = new SyncErrorLog(createStore() as never);
+    log.record(
+      'Sync path collision detected. The remote file was saved to "Notes/A.sync-conflict-20260901-081436.md".',
+      1_000,
+    );
+
+    expect(log.list()[0]?.message).toContain("sync-conflict-20260901-081436.md");
+  });
+
   it("renders as text that can be pasted into a report", () => {
     const log = new SyncErrorLog(createStore() as never);
     log.record("could not read Islam/Allah.md", Date.UTC(2026, 8, 1, 12, 0, 0));
