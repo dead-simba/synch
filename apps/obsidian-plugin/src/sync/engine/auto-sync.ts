@@ -485,7 +485,20 @@ export class SyncAutoLoop {
     const delay = Math.min(baseDelay * 2 ** this.syncRetryAttempt, maxDelay);
     this.syncRetryAttempt += 1;
     this.timers.set("syncRetry", () => {
-      if (!this.isActive() || !this.hasPendingWork()) {
+      if (!this.isActive()) {
+        return;
+      }
+
+      // Nothing left to retry: whatever failed has since been done, dropped or
+      // superseded. Returning here left the engine parked in retry_wait with
+      // no work and no path back - idle is only ever reported at the end of a
+      // drain, and no drain was coming. The status span reported "syncing"
+      // forever over a vault that was completely up to date, with no network
+      // traffic and nothing being written.
+      if (!this.hasPendingWork()) {
+        this.resetSyncRetry();
+        this.state.set("live");
+        this.deps.onIdle?.();
         return;
       }
 
