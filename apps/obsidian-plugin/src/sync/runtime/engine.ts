@@ -258,16 +258,7 @@ export class SyncEngine {
         vaultConfigRules: this.deps.getVaultConfigSyncRules(),
       }),
     onUndecryptableEntry: (event) => {
-      // Damaged beyond this device's reach: without its metadata there is no
-      // path to name and nothing to write. Saying so is all that can be done,
-      // and is better than a file quietly never arriving.
-      this.deps.notifyError(
-        new Error(
-          `A synced item could not be read and has been skipped so the rest of your vault keeps syncing ` +
-            `(entry ${event.entryId}@${event.revision}). Re-saving that file on the device it came from will replace it.`,
-        ),
-        "error.autoSync",
-      );
+      void this.reportUndecryptableEntry(event);
     },
     eventGate: this.syncEventGate,
     vaultAdapter: this.vaultAdapter,
@@ -608,6 +599,39 @@ export class SyncEngine {
       "error.autoSync",
     );
     this.deps.onFileSizeBlockedFilesChange?.();
+  }
+
+  /**
+   * Name the file behind an entry that could not be decrypted.
+   *
+   * The path lives inside the metadata that will not decrypt, so the damaged
+   * record cannot tell us. The local store can: if this entry ever synced to
+   * this device it has a row with the path. Telling someone to "re-save that
+   * file" and then handing them a UUID is not an instruction they can follow.
+   */
+  private async reportUndecryptableEntry(event: {
+    entryId: string;
+    revision: number;
+    error: unknown;
+  }): Promise<void> {
+    let path: string | null = null;
+    try {
+      path = (await this.syncStore?.getEntryById(event.entryId))?.path ?? null;
+    } catch {
+      // A lookup failure must not swallow the report it was decorating.
+    }
+
+    this.deps.notifyError(
+      new Error(
+        path
+          ? `"${path}" could not be read and has been skipped so the rest of your vault keeps syncing. ` +
+            `Open it on the device it came from and re-save it to replace the damaged copy.`
+          : `A synced item could not be read and has been skipped so the rest of your vault keeps syncing ` +
+            `(entry ${event.entryId}@${event.revision}). It has never reached this device, so compare your ` +
+            `devices to find what is missing, then re-save that file where it does exist.`,
+      ),
+      "error.autoSync",
+    );
   }
 
   async listFileSizeBlockedFiles(): Promise<SyncFileSizeBlockedFile[]> {

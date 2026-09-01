@@ -606,3 +606,80 @@ export class FilesNotSyncingModal extends Modal {
     this.contentEl.empty();
   }
 }
+
+/**
+ * A short history of the errors Syncali has reported.
+ *
+ * A notice lasts a few seconds. On a phone there is no console behind it and
+ * no log file to open, so an error seen on the bus is gone before it can be
+ * read - which is how the same fault ends up being diagnosed from memory,
+ * three times. Copy exists so the text can leave the phone intact.
+ */
+export class RecentProblemsModal extends Modal {
+  constructor(
+    app: App,
+    private readonly deps: {
+      listProblems: () => readonly { at: number; message: string }[];
+      asText: () => string;
+      clear: () => Promise<void>;
+    },
+  ) {
+    super(app);
+  }
+
+  onOpen(): void {
+    this.render();
+  }
+
+  private render(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+    new Setting(contentEl).setName(t("problems.header")).setHeading();
+    contentEl.createEl("p", { text: t("problems.desc"), cls: "synch-modal-hint" });
+
+    const problems = this.deps.listProblems();
+    if (problems.length === 0) {
+      contentEl.createEl("p", { text: t("problems.none") });
+      return;
+    }
+
+    const list = contentEl.createDiv();
+    for (const problem of problems) {
+      new Setting(list)
+        .setName(formatProblemTime(problem.at))
+        .setDesc(problem.message);
+    }
+
+    new Setting(contentEl)
+      .addButton((button) =>
+        button
+          .setButtonText(t("problems.copy"))
+          .setCta()
+          .onClick(async () => {
+            await navigator.clipboard.writeText(this.deps.asText());
+            new Notice(t("problems.copied"));
+          }),
+      )
+      .addButton((button) =>
+        button.setButtonText(t("problems.clear")).onClick(async () => {
+          await this.deps.clear();
+          new Notice(t("problems.cleared"));
+          this.render();
+        }),
+      );
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
+
+/** Local time, to the minute - enough to match an error against what you were doing. */
+function formatProblemTime(at: number): string {
+  return new Date(at).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}

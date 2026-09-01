@@ -24,6 +24,9 @@ export function createSettingsTab(
     getPluginVersion: vi.fn(() => "0.0.0-test"),
     listFileSizeBlockedFiles: vi.fn(async () => []),
     retryFilesNotSyncing: vi.fn(async () => {}),
+    listRecentProblems: vi.fn(() => []),
+    recentProblemsAsText: vi.fn(() => "No problems recorded."),
+    clearRecentProblems: vi.fn(async () => {}),
     isSyncEnabled: () => true,
     setSyncEnabled: vi.fn(async () => {}),
     getCommunityPluginUpdateStatus: () => ({

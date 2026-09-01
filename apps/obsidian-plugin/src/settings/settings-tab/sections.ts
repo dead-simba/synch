@@ -18,6 +18,7 @@ import {
 import {
   DeletedFilesModal,
   FilesNotSyncingModal,
+  RecentProblemsModal,
   ExcludedFoldersModal,
   IncludedHiddenFoldersModal,
 } from "./modals";
@@ -499,6 +500,21 @@ export function renderRemoteVaultSettings(
         new FilesNotSyncingModal(app, {
           listFiles: async () => await controller.listFileSizeBlockedFiles(),
           retry: async () => await controller.retryFilesNotSyncing(),
+        }).open();
+      }),
+    );
+
+  // Errors are shown as notices, which vanish. Keeping the last few means a
+  // problem can be read after the fact rather than remembered wrongly.
+  new Setting(containerEl)
+    .setName(t("problems.header"))
+    .setDesc(t("problems.desc"))
+    .addButton((button) =>
+      button.setButtonText(t("problems.view")).onClick(() => {
+        new RecentProblemsModal(app, {
+          listProblems: () => controller.listRecentProblems(),
+          asText: () => controller.recentProblemsAsText(),
+          clear: async () => await controller.clearRecentProblems(),
         }).open();
       }),
     );

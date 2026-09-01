@@ -3,10 +3,11 @@
 ## Added
 
 - The version you are running is now shown beside the Syncali heading in settings.
+- **Recent problems**, in settings. The last 50 errors Syncali showed you, with the time each happened, kept on disk so you can read one after its notice has gone. There is a copy button, because on a phone that is the only way to get the text out.
 
 ## Fixed
 
 - A single file that could not be read while scanning your vault failed the entire scan, which is what the engine uses to work out what to sync. Files are renamed, saved and moved constantly while you work, so this happened often. Such a file is now skipped and picked up on the next scan.
 - A single item that could not be read stopped everything else from syncing, permanently. It is now skipped and reported.
-- A failure to decrypt reported only "OperationError". It now says which entry failed and what to check.
+- A failure to decrypt reported only "OperationError". It now names the file it could not read, and says what to check.
 - Server problems were reported as "Unexpected token 'e', ... is not valid JSON" instead of what the server actually said.

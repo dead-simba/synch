@@ -37,6 +37,9 @@ export interface SynchSettingsController {
   getPluginVersion(): string;
   listFileSizeBlockedFiles(): Promise<SynchFileSizeBlockedFile[]>;
   retryFilesNotSyncing(): Promise<void>;
+  listRecentProblems(): readonly { at: number; message: string }[];
+  recentProblemsAsText(): string;
+  clearRecentProblems(): Promise<void>;
   isSyncEnabled(): boolean;
   setSyncEnabled(enabled: boolean): Promise<void>;
   getStorageStatus(): SynchStorageStatus | null;

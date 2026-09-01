@@ -10,6 +10,7 @@ import {
   t,
   type SynchErrorContextKey,
 } from "../i18n";
+import { SyncErrorLog, type SyncErrorLogEntry } from "./error-log";
 import { AuthManager, type AuthReadiness } from "../auth/manager";
 import { SynchPluginDataStore } from "../plugin-data";
 import type { SynchSettingsController } from "../settings/controller";
@@ -78,6 +79,7 @@ export class SynchPluginController implements SynchSettingsController {
   private readonly plugin = this.deps.plugin;
   private readonly pluginDataStore = new SynchPluginDataStore(this.plugin);
   private readonly settingsStore = new SynchSettingsStore(this.pluginDataStore);
+  private readonly errorLog = new SyncErrorLog(this.pluginDataStore);
   private readonly billingClient = new BillingClient();
   private readonly pluginUpdateChecker = new SynchPluginUpdateChecker();
   private readonly serverPluginVersionChecker = new SynchServerPluginVersionChecker();
@@ -202,6 +204,7 @@ export class SynchPluginController implements SynchSettingsController {
 
   async initialize(): Promise<void> {
     await this.pluginDataStore.initialize();
+    this.errorLog.load();
     await this.initializeSettings();
     await this.checkServerCompatibility();
     this.storedRemoteVaultKeySecret = await readStoredRemoteVaultKeySecret(this.plugin);
@@ -910,7 +913,26 @@ export class SynchPluginController implements SynchSettingsController {
   }
 
   private notifyError(error: unknown, contextKey: SynchErrorContextKey): void {
-    new Notice(formatErrorNotice(error, contextKey));
+    const message = formatErrorNotice(error, contextKey);
+    new Notice(message);
+    // A notice is gone in seconds, and on a phone there is no console behind
+    // it. Keeping the text means a problem seen while walking can still be
+    // read, and reported, once you are back at a desk.
+    this.errorLog.record(message);
+    void this.errorLog.persist();
+  }
+
+  listRecentProblems(): readonly SyncErrorLogEntry[] {
+    return this.errorLog.list();
+  }
+
+  recentProblemsAsText(): string {
+    return this.errorLog.toText();
+  }
+
+  async clearRecentProblems(): Promise<void> {
+    this.errorLog.clear();
+    await this.errorLog.persist();
   }
 
   private async checkServerCompatibility(): Promise<void> {
