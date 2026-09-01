@@ -3,6 +3,7 @@ import type { BlobBody, BlobDownload, BlobStorage } from "./storage";
 export type { BlobBody };
 
 const R2_LIST_BATCH_SIZE = 1000;
+const R2_DELETE_BATCH_SIZE = 1000;
 
 export class BlobRepository implements BlobStorage {
 	constructor(private readonly bucket: R2Bucket) {}
@@ -23,6 +24,17 @@ export class BlobRepository implements BlobStorage {
 
 	async delete(key: string): Promise<void> {
 		await this.bucket.delete(key);
+	}
+
+	async deleteMany(keys: readonly string[]): Promise<void> {
+		if (keys.length === 0) {
+			return;
+		}
+
+		// R2 takes up to 1000 keys per call, so a GC batch is a single round trip.
+		for (let i = 0; i < keys.length; i += R2_DELETE_BATCH_SIZE) {
+			await this.bucket.delete([...keys.slice(i, i + R2_DELETE_BATCH_SIZE)]);
+		}
 	}
 
 	async deleteByPrefix(prefix: string): Promise<void> {

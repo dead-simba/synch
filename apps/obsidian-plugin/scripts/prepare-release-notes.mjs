@@ -24,7 +24,7 @@ if (!/^[-*]\s+\S/m.test(body)) {
 await fs.mkdir(releaseDir, { recursive: true });
 await fs.writeFile(
   releaseNotesPath,
-  `# Synch ${version}\n\nReleased ${new Date().toISOString().slice(0, 10)}.\n\n${body}\n`,
+  `# Syncali ${version}\n\nReleased ${new Date().toISOString().slice(0, 10)}.\n\n${body}\n`,
 );
 
 console.log(releaseNotesPath);

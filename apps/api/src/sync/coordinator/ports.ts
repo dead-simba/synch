@@ -34,6 +34,16 @@ export interface SyncTokenVerifier {
 export interface BlobObjectRepository {
 	exists(key: string): Promise<boolean>;
 	delete(key: string): Promise<void>;
+	/**
+	 * Delete many objects in as few round trips as the backend allows.
+	 *
+	 * Garbage collection used to await one delete per blob. With a backlog of
+	 * over a thousand that is a thousand sequential round trips and a thousand
+	 * SQLite writes inside one Durable Object invocation, which is how a
+	 * coordinator ends up exceeding its CPU or memory limit and returning
+	 * Cloudflare's plain-text 1102 - to a client expecting JSON.
+	 */
+	deleteMany(keys: readonly string[]): Promise<void>;
 	deleteByPrefix(prefix: string): Promise<void>;
 }
 

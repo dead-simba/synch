@@ -1,10 +1,5 @@
 # Next Obsidian plugin release
 
-## Added
-
-- **Files not syncing** now has its own section in settings. It lists every file Syncali has set aside, says why for each one, and offers a single button to try them all again. Previously this was a tooltip on a small icon beside the sync status, which is unreachable on mobile.
-- That same button re-scans your whole vault, so a file that was skipped starts syncing without you having to rename it.
-
 ## Fixed
 
-- The mobile sync indicator always showed a warning triangle, whatever the actual state. It now shows a spinner while syncing and a tick when a sync finishes.
+- Server problems were reported as "Unexpected token 'e', ... is not valid JSON" instead of what the server actually said. When infrastructure fails it replies in plain text, and reading that as JSON threw a parse error that described our parser rather than your problem. The server's own words now come through.

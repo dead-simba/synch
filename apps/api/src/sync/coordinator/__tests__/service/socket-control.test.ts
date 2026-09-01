@@ -545,6 +545,7 @@ describe("coordinator websocket control messages", () => {
 		const stateRepository = socketStateRepository();
 		const socketService = socketServiceMock();
 		const blobRepository = {
+			deleteMany: vi.fn(async () => {}),
 			delete: vi.fn(async () => {}),
 		};
 		const service = createCoordinatorService({
@@ -571,7 +572,9 @@ describe("coordinator websocket control messages", () => {
 
 		await service.runGc("vault-1", { scheduleHealthFlush: false });
 
-		expect(blobRepository.delete).toHaveBeenCalledWith("vault-1/blob-1");
+		// One batched call, not one per blob: a GC pass over a large backlog used
+		// to be thousands of sequential deletes in a single invocation.
+		expect(blobRepository.deleteMany).toHaveBeenCalledWith(["vault-1/blob-1"]);
 		expect(socketService.broadcastStorageStatus).toHaveBeenCalledWith({
 			type: "storage_status_updated",
 			storageStatus: {
@@ -584,6 +587,7 @@ describe("coordinator websocket control messages", () => {
 	it("leaves purged history blobs retryable when immediate R2 deletion fails", async () => {
 		const stateRepository = socketStateRepository();
 		const blobRepository = {
+			deleteMany: vi.fn(async () => {}),
 			delete: vi.fn(async () => {
 				throw new Error("r2 unavailable");
 			}),

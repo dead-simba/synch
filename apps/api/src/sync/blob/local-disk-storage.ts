@@ -51,6 +51,12 @@ export class LocalDiskBlobStorage implements BlobStorage {
 		await rm(this.resolveKeyPath(key), { force: true });
 	}
 
+	async deleteMany(keys: readonly string[]): Promise<void> {
+		for (const key of keys) {
+			await this.delete(key);
+		}
+	}
+
 	async deleteByPrefix(prefix: string): Promise<void> {
 		await rm(this.resolveKeyPath(prefix), { recursive: true, force: true });
 	}

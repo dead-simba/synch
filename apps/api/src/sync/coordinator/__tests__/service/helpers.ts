@@ -248,6 +248,7 @@ function createBlobObjectRepository(): BlobObjectRepository {
 	return {
 		exists: vi.fn(async () => true),
 		delete: vi.fn(async () => {}),
+		deleteMany: vi.fn(async () => {}),
 		deleteByPrefix: vi.fn(async () => {}),
 	};
 }

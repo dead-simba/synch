@@ -100,9 +100,19 @@ export class BlobSyncService {
 
 		const now = options.now ?? Date.now();
 		const due = this.blobStore.listBlobsReadyForDeletion(now, GC_BATCH_SIZE);
-		for (const blob of due) {
-			await this.blobRepository.delete(blobObjectKey(effectiveVaultId, blob.blob_id));
-			this.blobStore.deleteBlobIfCollectible(blob.blob_id, now);
+		if (due.length > 0) {
+			// One round trip for the whole batch rather than one per blob. With a
+			// backlog in the thousands the old loop was thousands of sequential
+			// awaits inside a single Durable Object invocation, which is how the
+			// coordinator started returning Cloudflare's 1102 (CPU or memory
+			// exceeded) instead of a response - and the GC could never drain the
+			// backlog it was being crushed by.
+			await this.blobRepository.deleteMany(
+				due.map((blob) => blobObjectKey(effectiveVaultId, blob.blob_id)),
+			);
+			for (const blob of due) {
+				this.blobStore.deleteBlobIfCollectible(blob.blob_id, now);
+			}
 		}
 
 		const nextGcAt = this.blobStore.nextBlobGcAt();

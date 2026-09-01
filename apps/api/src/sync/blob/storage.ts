@@ -25,6 +25,8 @@ export interface BlobStorage {
 	upload(key: string, body: BlobBody): Promise<{ size: number }>;
 	download(key: string): Promise<BlobDownload | null>;
 	delete(key: string): Promise<void>;
+	/** Delete many objects in as few round trips as the backend allows. */
+	deleteMany(keys: readonly string[]): Promise<void>;
 	deleteByPrefix(prefix: string): Promise<void>;
 	exists(key: string): Promise<boolean>;
 }

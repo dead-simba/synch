@@ -91,6 +91,12 @@ export class S3BlobStorage implements BlobStorage {
 		}
 	}
 
+	async deleteMany(keys: readonly string[]): Promise<void> {
+		for (const key of keys) {
+			await this.delete(key);
+		}
+	}
+
 	async deleteByPrefix(prefix: string): Promise<void> {
 		let continuationToken: string | undefined;
 
