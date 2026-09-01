@@ -106,7 +106,15 @@ export class SyncLocalReconcileService {
       const existingHasPendingDelete =
         !!existing && pendingDeleteEntry?.entryId === existing.entryId;
       const restoredDeletedEntry = existing ? null : pendingDeleteEntry;
-      if (!existingHasPendingDelete && canSkipHash(existing, file)) {
+      // The stat cache skips a file whose size and timestamp are unchanged,
+      // which is what keeps a scan cheap. But "unchanged" is not "synced": an
+      // entry that never reached the server has to be looked at however long
+      // it has sat still, or it is skipped here forever and nothing downstream
+      // ever gets the chance to notice.
+      const everUploaded = existing
+        ? (remoteById.get(existing.entryId)?.revision ?? 0) > 0
+        : false;
+      if (!existingHasPendingDelete && everUploaded && canSkipHash(existing, file)) {
         continue;
       }
 
@@ -152,8 +160,20 @@ export class SyncLocalReconcileService {
       restoredDeletedEntry,
       hash,
     } of hashedFiles) {
+      // A matching hash means the file has not changed since it was recorded.
+      // It does not mean the file ever reached the server: a queued upload
+      // that was dropped - a rename or delete between queueing and pushing
+      // used to do this - leaves the record looking settled with nothing
+      // remote behind it and nothing queued to fix that. Nothing then ever
+      // re-queued it, because the hash kept matching, so the file silently
+      // never synced while progress counted it as outstanding forever. Seen
+      // as "syncing 99% - 1527 / 1529" that never finished.
+      const reachedServer = existing
+        ? (remoteById.get(existing.entryId)?.revision ?? 0) > 0
+        : false;
       if (
         existing &&
+        reachedServer &&
         !existingHasPendingDelete &&
         !existing.deleted &&
         existing.hash === hash
