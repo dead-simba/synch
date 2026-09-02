@@ -44,7 +44,22 @@ export interface ReconcileOnceResult {
   filesQueuedForDelete: number;
 }
 
+/**
+ * How many times one file may be queued for upload, in a single session,
+ * without ever reaching the server.
+ *
+ * Re-queueing a file that never arrived is right - that is how a dropped
+ * upload gets a second chance. Doing it unconditionally is not: a file whose
+ * upload cannot succeed is then re-uploaded on every scan, forever, burning
+ * request quota and never getting anywhere. Three attempts is enough for a
+ * transient failure and short enough to stop a loop.
+ */
+const MAX_UNCONFIRMED_UPLOAD_ATTEMPTS = 3;
+
 export class SyncLocalReconcileService {
+  /** Attempts per entry that have not yet resulted in anything on the server. */
+  private readonly unconfirmedUploadAttempts = new Map<string, number>();
+
   constructor(private readonly deps: SyncLocalReconcileServiceDeps) {}
 
   async reconcileOnce(): Promise<ReconcileOnceResult> {
@@ -211,9 +226,25 @@ export class SyncLocalReconcileService {
         hash,
         requireBaseBlob: shouldRequireBaseBlob(file.path, remote),
       });
+
+      // Count only attempts at a file with nothing on the server behind it.
+      // Once something lands the count is irrelevant, and an ordinary edit to
+      // an already-synced file must never be held back by it.
+      const attempts = remote && remote.revision > 0
+        ? 0
+        : (this.unconfirmedUploadAttempts.get(queued.entryId) ?? 0) + 1;
+      if (attempts === 0) {
+        this.unconfirmedUploadAttempts.delete(queued.entryId);
+      } else {
+        this.unconfirmedUploadAttempts.set(queued.entryId, attempts);
+      }
+      const exhausted = attempts > MAX_UNCONFIRMED_UPLOAD_ATTEMPTS;
+
       updates.push({
         entryId: queued.entryId,
-        dirty: queued.mutation,
+        dirty: exhausted
+          ? { ...queued.mutation, status: "blocked", blockedReason: "prepare_failed" }
+          : queued.mutation,
         requireBaseBlob: shouldRequireBaseBlob(file.path, remote),
         local: {
           entryId: queued.entryId,
